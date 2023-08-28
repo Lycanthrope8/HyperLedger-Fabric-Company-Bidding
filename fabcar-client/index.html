@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet" href="./styles.css">
+
+    <title>FabCar Using Hyperledger Fabric</title>
+</head>
+<body>
+    <div class="text-center">
+        <h1>
+            Fabcar
+        </h1>
+        <button onclick="getAll()">Get All Companies</button>
+        <span>||</span>
+        <input id="search-input" type="text">
+        <button onclick="search()">Search</button>
+        <div id="show-company"></div>
+    </div>
+
+
+    <div class="text-center form-container">
+        <form id="updateForm" action="" name="updateOwner" style="display: none;">
+            <h3>Bid for the company</h3>
+            <div>
+                <label for="bidLicenseNo">License Number:</label>
+                <input type="text" id="bidLicenseNo" name="licenseNo" required />
+            </div>            
+            
+            <div>
+                <label for="bidAmount">Bid Amount:</label>
+                <input type="number" id="bidAmount" name="owner" required />
+            </div>
+            <div>
+                <label for="bidderNID">Your NID:</label>
+                <input type="text" id="bidderNID" name="bidderNID" required />
+            </div>
+    
+            <div>
+                <button type="submit">Place Bid</button>
+            </div>
+        </form>
+    </div>
+    
+
+   
+    <div class="text-center form-container">
+        <form id="createForm" action="" name="createCompany">
+            <label for="companyName">Company Name:</label>
+            <input type="text" id="companyName" name="companyName" required><br>
+                
+            <label for="licenseNo">License Number:</label>
+            <input type="text" id="licenseNo" name="licenseNo" required><br>
+        
+            <label for="currentCapital">Current Capital:</label>
+            <input type="number" id="currentCapital" name="currentCapital" required><br>
+        
+            <label for="currentDebt">Current Debt:</label>
+            <input type="number" id="currentDebt" name="currentDebt" required><br>
+        
+            <label for="currentRevenue">Current Revenue:</label>
+            <input type="number" id="currentRevenue" name="currentRevenue" required><br>
+        
+            <label for="minimumBiddingAmount">Minimum Bidding Amount:</label>
+            <input type="number" id="minimumBiddingAmount" name="minimumBiddingAmount" required><br>
+        
+            <label for="ownerNID">Owner NID:</label>
+            <input type="text" id="ownerNID" name="ownerNID" required><br>
+        
+            <button type="submit">Add Company</button>
+        </form>
+    </div>
+    
+
+    
+    
+    <script>
+
+        // CREATING NEW CAR
+        const createForm = document.getElementById('createForm')
+        // THIS IS AN EVENT LISTENER WHICH WILL RUN WHEN WE CLICK THE CREATE BUTTON
+        createForm.addEventListener("submit", function(event) {
+            event.preventDefault()
+            const bodyParam = new URLSearchParams( new FormData(createForm) )
+            
+                //CALLING CREATE API
+                fetch('http://localhost:3000/create', {
+                    method: 'POST',
+                    body: bodyParam
+                })
+                .then(res => {
+                    return res.json()
+                })
+                .then( parsedRes => {
+                    alert(parsedRes.message)
+                })
+                .catch(err => {
+                    console.error({ err })
+                })
+        });
+
+        // UPDATE: CHANGING CAR OWNER
+        const updateForm = document.getElementById('updateForm');
+
+// Update form submission event
+updateForm.addEventListener("submit", async function(event) {
+    event.preventDefault();
+    const licenseNo = document.getElementById('bidLicenseNo').value;
+    const bidAmount = document.getElementById('bidAmount').value;
+    const bidderNID = document.getElementById('bidderNID').value;
+
+    const bodyParam = new URLSearchParams({
+        licenseNo: licenseNo,
+        bidAmount: bidAmount,
+        bidderNID: bidderNID
+    });
+
+    try {
+        const response = await fetch('http://localhost:3000/givenBid', {
+            method: 'POST',
+            body: bodyParam
+        });
+        const result = await response.json();
+        if (response.status === 200) {
+            alert(result.message);
+            getAll();
+        } else {
+            throw new Error(result.message);
+        }
+
+        console.log('Response status:', response.status);
+        console.log('Response result:', result);
+
+        
+    } catch (err) {
+        console.error(err);
+        alert('Error: ' + err.message);
+    }
+
+});
+
+
+
+
+        //SEARCH DATA
+        function search(){
+            // extracting value from input field
+            const value = document.getElementById('search-input').value
+            getAll( value )
+        }
+        
+        // GETTING ALL CAR DATA FROM API
+        function getAll( query ){
+            const api = query ? 'http://localhost:3000/get-company?key=' + query :  'http://localhost:3000/get-company'
+            fetch(api)
+                .then( res => {
+                    return res.json();
+                })
+                .then( parsedRes => {
+                    let carMarkup = ''; 
+                    parsedRes.forEach( item => {
+                        carMarkup = carMarkup +
+                            `<div class="car-item" data-license-no="${item.Record.license_no}"> 
+                                <p>Company Name: ${ item.Record.companyName }</p>
+                                <p>License Number: ${ item.Record.license_no }</p>
+                                <p>Current Capital: ${ item.Record.currentCapital }</p>
+                                <p>Current Debt: ${ item.Record.currentDebt }</p>
+                                <p>Current Revenue: ${ item.Record.currentRevenue }</p>
+                                <p>Minimum Bidding Amount: ${ item.Record.minimumBiddingAmount }</p>
+                                <p>Current Bidding Amount: ${ item.Record.currentBiddingAmount}</p>
+                                <p>Bids Remaining: ${ item.Record.remainingBids}</p>
+                                <button onclick="openBidForm('${item.Record.license_no}','${item.Record.minimumBiddingAmount}','${item.Record.currentBiddingAmount}')">Bid</button>
+                                <button onclick="toggleBiddingHistory('${item.Record.license_no}')">Bidding History</button>
+                                <div class="bidding-history-container" style="display: none;"></div>
+                            </div>`
+                    })
+
+                    // getting the html container with id=show-company
+                    const carContainer = document.getElementById('show-company')
+
+                    //CLEANING EXISTING CAR HTML NODE/ELEMENT
+                    while (carContainer.hasChildNodes()) {
+                        carContainer.removeChild(carContainer.firstChild);
+                    }
+
+                    // Adding new car data markup
+                    carContainer.insertAdjacentHTML('beforeend', carMarkup)
+                })
+                .catch(err => {
+                    alert('Operation failed')
+                    console.error({ err })
+                })
+        }
+
+        // Function to open the bid form with the specified license number
+        function openBidForm(licenseNo,minimumBiddingAmount,currentBiddingAmount) {
+                const bidLicenseNoInput = document.getElementById('bidLicenseNo');
+                bidLicenseNoInput.value = licenseNo;
+
+                const bidAmountInput = document.getElementById('bidAmount');
+
+                if(currentBiddingAmount>minimumBiddingAmount){
+                    bidAmountInput.value = currentBiddingAmount;
+                }else{
+                    bidAmountInput.value = minimumBiddingAmount;
+                }
+
+                // Display the bid form
+                const bidForm = document.getElementById('updateForm');
+                bidForm.style.display = 'block';
+            }
+
+            function toggleBiddingHistory(licenseNo) {
+                const historyContainer = document.querySelector(`[data-license-no="${licenseNo}"] .bidding-history-container`);
+                if (historyContainer.style.display === 'none') {
+                    // If bidding history is hidden, fetch and show it
+                    this.getBiddingHistory(licenseNo, historyContainer); // Call using "this."
+                    historyContainer.style.display = 'block';
+                } else {
+                    // If bidding history is visible, hide it
+                    historyContainer.style.display = 'none';
+                }
+            }
+
+
+            async function getBiddingHistory(licenseNo, container) {
+                const response = await fetch(`http://localhost:3000/getBiddingHistory/${licenseNo}`);
+                const historyData = await response.json();
+                historyData.pop();
+                console.log(historyData);
+                if (historyData && historyData.length > 0) {
+                    historyData.forEach((item, index) => {
+                        const value = JSON.parse(item.value);
+
+                        const historyItem = document.createElement('div');
+                        historyItem.className = 'bidding-history-item';
+                        historyItem.innerHTML = `<p>Bidder Number: ${((index)-historyData.length)*(-1)}</p>
+                                                <p>Bid Amount: ${value.currentBiddingAmount}</p>
+                                                <p>Bidder NID: ${value.highestBidderNID}</p>
+                                                <!--<p>Timestamp: ${value.timestamp}</p>-->
+                                                <hr>`;
+                        container.appendChild(historyItem);
+                    });
+                } else {
+                    container.innerHTML = '<p>No bidding history available.</p>';
+                }
+            }
+
+
+
+
+
+
+
+
+        
+    </script>
+</body>
+</html>
